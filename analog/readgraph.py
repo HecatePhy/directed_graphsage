@@ -124,9 +124,19 @@ def convert(integer, length):
     bool_list[integer] = 1
     return bool_list
 
+def type_rule(type1, type2):
+    types1 = ['diode', 'res', 'cap']
+    types2 = ['pfet', 'nfet', 'pfet_lvt', 'nfet_lvt']
+    if type1 in types1:
+        return (type1 == type2)
+    if type1 in types2:
+        return (type2 in types2)
+    return 0
+
 if __name__ == '__main__':
     # pickle file
     filename = sys.argv[1]
+    test_subckt = int(sys.argv[2])
 
     with open(filename, "rb") as f:
         dataX, dataY = pickle.load(f)
@@ -141,7 +151,8 @@ if __name__ == '__main__':
     ratio = 0.7     # #training_samples/#total_samples
     for i in range(len(dataX)):
         sub_G = nx.Graph()
-        train = i < int(len(dataX)*ratio)   # split training and test set
+        #train = i < int(len(dataX)*ratio)   # split training and test set
+        train = (i != test_subckt)
             #train = True
         #else:
             #train = False
@@ -153,7 +164,8 @@ if __name__ == '__main__':
             node_att[g.id+num_nodes] = g.attributes['cell']
             node_type.append(g.attributes['cell'])
             #node_is_pin.append(np.array([1, 0]))
-            #G.add_node(g.id+num_nodes)
+            G.add_node(g.id+num_nodes)
+            sub_G.add_node(g.id+num_nodes)
             # comment lines below and uncomment line above if using pin info
             for p in g.pins:
                 pin_map[p] = g.id
@@ -165,15 +177,19 @@ if __name__ == '__main__':
             edges = combinations(node_list, 2)
             for edge in edges:
                 G.add_edge(edge[0]+num_nodes, edge[1]+num_nodes)
-                sub_G.add_edge(edge[0]+num_nodes, edge[1]+num_nodes)
+                #sub_G.add_edge(edge[0]+num_nodes, edge[1]+num_nodes)
 
-        node_pairs = list(sub_G.edges()) # all possible node pairs
+        node_pairs = list(combinations(list(sub_G.nodes()), 2)) # all possible node pairs
         #random.seed(1)
         #random.shuffle(node_pairs)
         neg_pairs = []
         neg_size = 300000000
+        #neg_size = 20
         for pair in node_pairs:
-            if [pair[0]-num_nodes, pair[1]-num_nodes] in label:
+            if [pair[0]-num_nodes, pair[1]-num_nodes] in label or [pair[1]-num_nodes, pair[0]-num_nodes] in label:
+                continue
+            type1, type2 = graph.nodes[pair[0]-num_nodes].attributes['cell'], graph.nodes[pair[1]-num_nodes].attributes['cell']
+            if not type_rule(type1, type2):
                 continue
             if train:
                 if len(neg_pairs) > neg_size*len(label):
